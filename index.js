@@ -38,9 +38,9 @@ app.use(helmet.contentSecurityPolicy({
 // Route to handle user registration securely
 app.post('/register', async (req, res) => {
     const { username, password } = req.body;
-    const hashedPassword = await bcrypt.hash(password, 10);
 
-    db.run('INSERT INTO users (username, password) VALUES (?, ?)', [username, hashedPassword], (err) => {
+    // Insecure: Store password in plain text without hashing
+    db.run('INSERT INTO users (username, password) VALUES (?, ?)', [username, password], (err) => {
         if (err) {
             return res.status(500).json({ error: err.message });
         }
@@ -51,61 +51,34 @@ app.post('/register', async (req, res) => {
 // Route for user login with parameterized query
 app.post('/login', (req, res) => {
     const { username, password } = req.body;
-    const query = 'SELECT * FROM users WHERE username=?';
 
-    db.get(query, [username], async (err, row) => {
+    // Insecure: No parameterization, susceptible to SQL injection
+    const query = `SELECT * FROM users WHERE username='${username}' AND password='${password}'`;
+
+    db.all(query, (err, rows) => {
         if (err) {
             return res.status(500).json({ error: err.message });
         }
 
-        if (row) {
-            const isPasswordValid = await bcrypt.compare(password, row.password);
-
-            if (isPasswordValid) {
-                return res.json({ message: 'Login successful!' });
-            }
+        if (rows.length > 0) {
+            return res.json({ message: 'Login successful!' });
+        } else {
+            return res.status(401).json({ error: 'Invalid credentials' });
         }
-
-        return res.status(401).json({ error: 'Invalid credentials' });
     });
 });
 
-// Sanitize user input to prevent XSS
+// Intentionally vulnerable to XSS
 app.get('/search', (req, res) => {
-    const query = sanitizeInput(req.query.q);
-    res.send(`<p>You searched for: ${query}</p>`);
+    const query = req.query.q;
+
+    // Insecure: Directly inject user input into the HTML response without sanitization
+    res.send(`<p>You searched for: ${query}</p><script>alert('XSS Vulnerability');</script>`);
 });
 
-app.get('/profile', (req, res) => {
-    const username = sanitizeInput(req.query.username);
-    res.send(`<p>Hello, ${username}!</p>`);
-});
-
-app.post('/post', (req, res) => {
-    const postContent = sanitizeInput(req.body.content);
-    db.run('INSERT INTO posts (content) VALUES (?)', [postContent], (err) => {
-        if (err) {
-            return res.status(500).json({ error: err.message });
-        }
-        res.send('<p>Post created successfully!</p>');
-    });
-});
-
-// Implement authentication middleware to protect sensitive routes
-const authenticateUser = (req, res, next) => {
-    // Implement your authentication logic here
-    // For example, you can use tokens, sessions, or JWTs
-    const isAuthenticated = true; // Replace with your authentication check
-    if (isAuthenticated) {
-        return next();
-    } else {
-        return res.status(401).json({ error: 'Unauthorized' });
-    }
-};
-
-// Secure the /admin route with authentication middleware
-app.get('/admin', authenticateUser, (req, res) => {
-    // Only authenticated users can access this route
+// No authentication check for /admin route
+app.get('/admin', (req, res) => {
+    // Insecure: No proper authentication check
     db.all('SELECT id, username FROM users', (err, rows) => {
         if (err) {
             return res.status(500).json({ error: err.message });
@@ -129,10 +102,3 @@ app.get('/logout', (req, res) => {
 app.listen(port, () => {
     console.log(`Server running on http://localhost:${port}`);
 });
-
-// Function to sanitize user input to prevent XSS
-function sanitizeInput(input) {
-    // Implement your sanitation logic here
-    // You can use libraries like DOMPurify or create your own sanitation methods
-    return input;
-}
