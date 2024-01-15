@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const session = require('express-session');
 const morgan = require('morgan');
 const csurf = require('csurf');
+const { check, validationResult } = require('express-validator');
 const path = require('path');
 
 const app = express();
@@ -36,7 +37,16 @@ app.use(helmet.contentSecurityPolicy({
 }));
 
 // Route to handle user registration securely
-app.post('/register', async (req, res) => {
+app.post('/register', [
+    check('username').notEmpty().trim().escape(),
+    check('password').notEmpty().trim().escape(),
+], async (req, res) => {
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
     const { username, password } = req.body;
 
     // Insecure: Store password in plain text without hashing
@@ -49,13 +59,22 @@ app.post('/register', async (req, res) => {
 });
 
 // Route for user login with parameterized query
-app.post('/login', (req, res) => {
+app.post('/login', [
+    check('username').notEmpty().trim().escape(),
+    check('password').notEmpty().trim().escape(),
+], (req, res) => {
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
     const { username, password } = req.body;
 
-    // Insecure: No parameterization, susceptible to SQL injection
-    const query = `SELECT * FROM users WHERE username='${username}' AND password='${password}'`;
-
-    db.all(query, (err, rows) => {
+    // Use parameterized query to prevent SQL injection
+    const query = 'SELECT * FROM users WHERE username = ? AND password = ?';
+    
+    db.all(query, [username, password], (err, rows) => {
         if (err) {
             return res.status(500).json({ error: err.message });
         }
@@ -85,6 +104,52 @@ app.get('/admin', (req, res) => {
         }
 
         return res.json(rows);
+    });
+});
+
+// Sanitize user input to prevent XSS
+app.get('/search', [
+    check('q').notEmpty().trim().escape(),
+], (req, res) => {
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
+    const query = sanitizeInput(req.query.q);
+    res.send(`<p>You searched for: ${query}</p>`);
+});
+
+app.get('/profile', [
+    check('username').notEmpty().trim().escape(),
+], (req, res) => {
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
+    const username = sanitizeInput(req.query.username);
+    res.send(`<p>Hello, ${username}!</p>`);
+});
+
+app.post('/post', [
+    check('content').notEmpty().trim().escape(),
+], (req, res) => {
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
+    const postContent = sanitizeInput(req.body.content);
+    db.run('INSERT INTO posts (content) VALUES (?)', [postContent], (err) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+
+        return res.json({ message: 'Post created successfully!' });
     });
 });
 
