@@ -17,7 +17,7 @@ db.run('CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY, content TEXT)'
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(session({
-    secret: 'your_secret_key',
+    secret: 'IrelandForever123#',
     resave: false,
     saveUninitialized: true,
     cookie: {
@@ -86,6 +86,35 @@ app.get('/admin', (req, res) => {
 
         return res.json(rows);
     });
+});
+
+// SQL Injection Testing
+app.get('/test-sql-injection', (req, res) => {
+    const username = req.query.username;
+    const password = req.query.password;
+
+    // Insecure: Constructing SQL query without proper validation
+    const query = `SELECT * FROM users WHERE username='${username}' AND password='${password}'`;
+
+    db.all(query, (err, rows) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+
+        if (rows.length > 0) {
+            return res.json({ message: 'Login successful!' });
+        } else {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+    });
+});
+
+// XSS Testing
+app.get('/test-xss', (req, res) => {
+    const query = req.query.q;
+
+    // Insecure: Directly inject user input into the HTML response without sanitization
+    res.send(`<p>You searched for: ${query}</p>`);
 });
 
 // Logout route
