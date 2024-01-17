@@ -2,12 +2,92 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:">
-    <title>Your Title</title>
-    <!-- Other head elements (stylesheets, scripts, etc.) go here -->
+
+    <!-- Content Security Policy (CSP) Header -->
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src 'none';
+        script-src 'self' 'nonce-%N';
+        style-src 'self';
+        img-src 'self' data:;
+    ">
+
+    <!-- Nonce Declaration -->
+    <script nonce="%N">
+        // Inline script with nonce
+        console.log('This is my App');
+    </script>
+
+    <title>Web-App</title>
 </head>
 <body>
-    <!-- HTML content goes here -->
+    <h1>Login</h1>
+    <header>
+        <h1>My Game App, Welcome!</h1>
+        <nav>
+            <ul>
+                <li><a href="register.html">Register</a></li>
+                <li><a href="explore.html">Explore Games</a></li>
+                <li><a href="admin.html">Admin Dashboard</a></li>
+            </ul>
+        </nav>
+    </header>
+    <!-- Login Form -->
+    <form id="loginForm">
+        <label for="username">Username:</label>
+        <input type="text" id="username" name="username" required>
+
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password" required>
+
+        <button type="submit">Login</button>
+    </form>
+
+    <!-- Display results or messages here -->
+    <div id="outputSection"></div>
+
+    <!-- JavaScript code -->
+    <script nonce="%N">
+        document.addEventListener('DOMContentLoaded', function () {
+            var loginForm = document.getElementById('loginForm');
+
+            loginForm.addEventListener('submit', function (event) {
+                event.preventDefault();
+
+                var username = document.getElementById('username').value;
+                var password = document.getElementById('password').value;
+
+                // Basic validation (you may want to enhance this)
+                if (!username || !password) {
+                    alert('Please enter both username and password.');
+                    return;
+                }
+
+                // Assuming you have a server endpoint for login, replace 'YOUR_LOGIN_ENDPOINT' with the actual URL
+                var loginEndpoint = '/insecure/login';
+
+                // Create a FormData object
+                var formData = new FormData();
+                formData.append('username', username);
+                formData.append('password', password);
+
+                // Send a POST request using fetch
+                fetch(loginEndpoint, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Handle the response
+                    document.getElementById('outputSection').innerHTML = '<p>' + data.message + '</p>';
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('outputSection').innerHTML = '<p>Error occurred. Please try again.</p>';
+                });
+            });
+        });
+    </script>
 </body>
 </html>
